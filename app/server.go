@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 )
 
 func main() {
@@ -31,23 +32,29 @@ func main() {
 		}
 		fmt.Println("Connection accepted")
 		buf := make([]byte, 1024)
-		_, err = conn.Read(buf)
+		n, err := conn.Read(buf)
 		if err != nil {
 			fmt.Println("Error reading from conn: ", err.Error())
 			os.Exit(1)
+		}
+		commands := strings.Split(strings.TrimSpace(string(buf[:n])), "\n")
+
+		for _, cmd := range commands {
+			fmt.Println("Read from conn: ", cmd)
+			if err != nil {
+				fmt.Println("Error reading from conn: ", err.Error())
+				os.Exit(1)
+			}
+			fmt.Println("Successfully read from conn")
+			_, err = conn.Write([]byte("+PONG\r\n"))
+			if err != nil {
+				fmt.Println("Error writing to conn: ", err.Error())
+				os.Exit(1)
+			}
 		}
 
-		fmt.Println("Read from conn: ", string(buf))
-		if err != nil {
-			fmt.Println("Error reading from conn: ", err.Error())
-			os.Exit(1)
-		}
-		fmt.Println("Successfully read from conn")
-		_, err = conn.Write([]byte("+PONG\r\n"))
-		if err != nil {
-			fmt.Println("Error writing to conn: ", err.Error())
-			os.Exit(1)
-		}
 		fmt.Println("Successfully wrote to conn")
+		conn.Close()
+		fmt.Println("Connection closed")
 	}
 }
