@@ -46,12 +46,12 @@ func main() {
 				os.Exit(1)
 			}
 			fmt.Println("Successfully read from conn")
-			_, err = conn.Write([]byte("+PONG\r\n"))
 			if err != nil {
 				fmt.Println("Error writing to conn: ", err.Error())
 				os.Exit(1)
 			}
 		}
+		_, err = conn.Write([]byte("+PONG\r\n"))
 
 		fmt.Println("Successfully wrote to conn")
 		conn.Close()
