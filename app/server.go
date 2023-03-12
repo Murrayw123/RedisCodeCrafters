@@ -2,9 +2,9 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"net"
 	"os"
-	"strings"
 )
 
 func main() {
@@ -23,38 +23,23 @@ func main() {
 		}
 	}()
 
+	fmt.Println("Waiting for connection")
+	conn, err := l.Accept()
+
 	for {
-		fmt.Println("Waiting for connection")
-		conn, err := l.Accept()
-		if err != nil {
-			fmt.Println("Error accepting conn: ", err.Error())
-			os.Exit(1)
-		}
-		fmt.Println("Connection accepted")
 		buf := make([]byte, 1024)
-		n, err := conn.Read(buf)
-		if err != nil {
-			fmt.Println("Error reading from conn: ", err.Error())
-			os.Exit(1)
-		}
-		commands := strings.Split(strings.TrimSpace(string(buf[:n])), "\n")
 
-		for _, cmd := range commands {
-			fmt.Println("Read from conn: ", cmd)
-			if err != nil {
-				fmt.Println("Error reading from conn: ", err.Error())
-				os.Exit(1)
-			}
-			fmt.Println("Successfully read from conn")
-			if err != nil {
-				fmt.Println("Error writing to conn: ", err.Error())
+		if _, err := conn.Read(buf); err != nil {
+			if err == io.EOF {
+				break
+			} else {
+				fmt.Println("error reading from client: ", err.Error())
 				os.Exit(1)
 			}
 		}
-		_, err = conn.Write([]byte("+PONG\r\n"))
 
-		fmt.Println("Successfully wrote to conn")
-		conn.Close()
-		fmt.Println("Connection closed")
+		// Let's ignore the client's input for now and hardcode a response.
+		// We'll implement a proper Redis Protocol parser in later stages.
+		conn.Write([]byte("+PONG\r\n"))
 	}
 }
