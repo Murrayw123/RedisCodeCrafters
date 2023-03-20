@@ -34,17 +34,13 @@ func handleRequest(conn net.Conn) {
 		if string(buf) == "ping" {
 			previousCommand = "PING"
 			conn.Write([]byte("+PONG\r\n"))
-			return
-		}
-
-		if previousCommand == "ECHO" {
+		} else if previousCommand == "ECHO" {
 			conn.Write([]byte("+" + string(buf) + "\r\n"))
-			return
 		} else {
 			previousCommand = string(buf)
+			conn.Write([]byte("+OK\r\n"))
 		}
 
-		conn.Write([]byte("+OK\r\n"))
 	}
 	fmt.Println("Client disconnected: ", conn.RemoteAddr().String())
 }
