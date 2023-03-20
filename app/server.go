@@ -27,14 +27,14 @@ func handleRequest(conn net.Conn) {
 
 		fmt.Println("RAW Received: ", string(buf))
 
-		buf = bytes.Split(buf, []byte("\r\n"))[2]
+		command := bytes.Split(buf, []byte("\r\n"))[2]
 
 		fmt.Println("Received: ", string(buf)+"\r\n")
 
-		if string(buf) == "ping" {
+		if string(command) == "ping" {
 			conn.Write([]byte("+PONG\r\n"))
-		} else if string(buf) == "echo" {
-			message := bytes.Split(buf, []byte(" "))[3]
+		} else if string(command) == "echo" {
+			message := bytes.Split(buf, []byte("\r\n"))[4]
 			conn.Write([]byte("+" + string(message) + "\r\n"))
 		} else {
 			conn.Write([]byte("+OK\r\n"))
