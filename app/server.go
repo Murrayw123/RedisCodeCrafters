@@ -27,6 +27,8 @@ func handleRequest(conn net.Conn) {
 			}
 		}
 
+		fmt.Println("RAW Received: ", string(buf))
+
 		buf = bytes.Split(buf, []byte("\r\n"))[2]
 
 		fmt.Println("Received: ", string(buf)+"\r\n")
