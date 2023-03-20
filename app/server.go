@@ -11,8 +11,6 @@ import (
 func handleRequest(conn net.Conn) {
 	fmt.Println("Client connected: ", conn.RemoteAddr().String())
 
-	previousCommand := ""
-
 	for {
 		fmt.Println("Waiting for data")
 		buf := make([]byte, 1024)
@@ -34,12 +32,11 @@ func handleRequest(conn net.Conn) {
 		fmt.Println("Received: ", string(buf)+"\r\n")
 
 		if string(buf) == "ping" {
-			previousCommand = "PING"
 			conn.Write([]byte("+PONG\r\n"))
-		} else if previousCommand == "ECHO" {
-			conn.Write([]byte("+" + string(buf) + "\r\n"))
+		} else if string(buf) == "echo" {
+			message := bytes.Split(buf, []byte(" "))[3]
+			conn.Write([]byte("+" + string(message) + "\r\n"))
 		} else {
-			previousCommand = string(buf)
 			conn.Write([]byte("+OK\r\n"))
 		}
 
