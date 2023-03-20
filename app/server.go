@@ -31,7 +31,7 @@ func handleRequest(conn net.Conn) {
 
 		fmt.Println("Received: ", string(buf)+"\r\n")
 
-		if string(buf) == "PING" {
+		if string(buf) == "ping" {
 			previousCommand = "PING"
 			conn.Write([]byte("+PONG\r\n"))
 			return
