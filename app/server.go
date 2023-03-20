@@ -25,11 +25,14 @@ func handleRequest(conn net.Conn) {
 			}
 		}
 
-		fmt.Println("RAW Received: ", bytes.Split(buf, []byte("\r\n")))
+		buf = bytes.Split(buf, []byte("\r\n"))[1]
+		buf1 := bytes.Split(buf, []byte("\r\n"))[1]
+		buf2 := bytes.Split(buf, []byte("\r\n"))[2]
+		buf3 := bytes.Split(buf, []byte("\r\n"))[3]
 
-		buf = bytes.Split(buf, []byte("\r\n"))[2]
-
-		fmt.Println("Received: ", string(buf)+"\r\n")
+		fmt.Println("Received: ", string(buf1)+"\r\n")
+		fmt.Println("Received: ", string(buf2)+"\r\n")
+		fmt.Println("Received: ", string(buf3)+"\r\n")
 
 		if string(buf) == "ping" {
 			conn.Write([]byte("+PONG\r\n"))
