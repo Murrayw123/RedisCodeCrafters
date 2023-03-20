@@ -27,18 +27,24 @@ func handleRequest(conn net.Conn) {
 			}
 		}
 
-		// split the string by line break
 		buf = bytes.Split(buf, []byte("\r\n"))[2]
 
 		fmt.Println("Received: ", string(buf)+"\r\n")
+
+		if string(buf) == "PING" {
+			previousCommand = "PING"
+			conn.Write([]byte("+PONG\r\n"))
+			return
+		}
 
 		if previousCommand == "ECHO" {
 			conn.Write([]byte("+" + string(buf) + "\r\n"))
 			return
 		} else {
 			previousCommand = string(buf)
-			conn.Write([]byte("+PONG\r\n"))
 		}
+
+		conn.Write([]byte("+OK\r\n"))
 	}
 	fmt.Println("Client disconnected: ", conn.RemoteAddr().String())
 }
