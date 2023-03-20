@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"net"
@@ -8,11 +9,17 @@ import (
 )
 
 func handleRequest(conn net.Conn) {
+	fmt.Println("Client connected: ", conn.RemoteAddr().String())
+
+	previousCommand := ""
+
 	for {
+		fmt.Println("Waiting for data")
 		buf := make([]byte, 1024)
 
 		if _, err := conn.Read(buf); err != nil {
 			if err == io.EOF {
+				// client has closed the connection
 				break
 			} else {
 				fmt.Println("error reading from client: ", err.Error())
@@ -20,10 +27,20 @@ func handleRequest(conn net.Conn) {
 			}
 		}
 
-		// Let's ignore the client's input for now and hardcode a response.
-		// We'll implement a proper Redis Protocol parser in later stages.
-		conn.Write([]byte("+PONG\r\n"))
+		// split the string by line break
+		buf = bytes.Split(buf, []byte("\r\n"))[2]
+
+		fmt.Println("Received: ", string(buf)+"\r\n")
+
+		if previousCommand == "ECHO" {
+			conn.Write([]byte("+" + string(buf) + "\r\n"))
+			return
+		} else {
+			previousCommand = string(buf)
+			conn.Write([]byte("+PONG\r\n"))
+		}
 	}
+	fmt.Println("Client disconnected: ", conn.RemoteAddr().String())
 }
 
 func main() {
