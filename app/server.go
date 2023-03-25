@@ -26,31 +26,26 @@ func handleRequest(conn net.Conn, store map[string]string) {
 			}
 		}
 
-		fmt.Println("RAW Received: ", string(buf))
+		command := strings.ToLower(string(bytes.Split(buf, []byte("\r\n"))[2]))
 
-		command := string(bytes.Split(buf, []byte("\r\n"))[2])
-		command = strings.ToLower(command)
-
-		fmt.Println("Received: ", string(buf)+"\r\n")
-
-		if command == "ping" {
+		switch command {
+		case "ping":
 			conn.Write([]byte("+PONG\r\n"))
-		} else if command == "echo" {
+		case "echo":
 			message := bytes.Split(buf, []byte("\r\n"))[4]
 			conn.Write([]byte("+" + string(message) + "\r\n"))
-		} else if command == "set" {
+		case "set":
 			key := bytes.Split(buf, []byte("\r\n"))[4]
 			value := bytes.Split(buf, []byte("\r\n"))[6]
 			store[string(key)] = string(value)
 			conn.Write([]byte("+OK\r\n"))
-		} else if command == "get" {
+		case "get":
 			key := bytes.Split(buf, []byte("\r\n"))[4]
 			value := store[string(key)]
 			conn.Write([]byte("+" + value + "\r\n"))
-		} else {
+		default:
 			conn.Write([]byte("+OK\r\n"))
 		}
-
 	}
 	fmt.Println("Client disconnected: ", conn.RemoteAddr().String())
 }
