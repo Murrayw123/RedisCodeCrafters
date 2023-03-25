@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"strings"
 )
 
 func handleRequest(conn net.Conn, store map[string]string) {
@@ -27,21 +28,22 @@ func handleRequest(conn net.Conn, store map[string]string) {
 
 		fmt.Println("RAW Received: ", string(buf))
 
-		command := bytes.Split(buf, []byte("\r\n"))[2]
+		command := string(bytes.Split(buf, []byte("\r\n"))[2])
+		command = strings.ToLower(command)
 
 		fmt.Println("Received: ", string(buf)+"\r\n")
 
-		if string(command) == "ping" {
+		if command == "ping" {
 			conn.Write([]byte("+PONG\r\n"))
-		} else if string(command) == "echo" {
+		} else if command == "echo" {
 			message := bytes.Split(buf, []byte("\r\n"))[4]
 			conn.Write([]byte("+" + string(message) + "\r\n"))
-		} else if string(command) == "SET" {
+		} else if command == "set" {
 			key := bytes.Split(buf, []byte("\r\n"))[4]
 			value := bytes.Split(buf, []byte("\r\n"))[6]
 			store[string(key)] = string(value)
 			conn.Write([]byte("+OK\r\n"))
-		} else if string(command) == "GET" {
+		} else if command == "get" {
 			key := bytes.Split(buf, []byte("\r\n"))[4]
 			value := store[string(key)]
 			conn.Write([]byte("+" + value + "\r\n"))
