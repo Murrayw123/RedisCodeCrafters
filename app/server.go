@@ -13,14 +13,18 @@ import (
 
 type StoreValue struct {
 	value     string
-	timeout   int
-	timeAdded int
+	timeout   int64
+	timeAdded int64
+}
+
+func getTimeInMilliseconds() int64 {
+	return time.Now().UnixNano() / int64(time.Millisecond)
 }
 
 func checkAllValuesForExpired(store map[string]StoreValue) {
 	for key, value := range store {
 		if value.timeout != 0 {
-			if value.timeAdded+(value.timeout/1000) < int(time.Now().Unix()) {
+			if value.timeAdded+value.timeout < getTimeInMilliseconds() {
 				delete(store, key)
 			}
 		}
@@ -40,7 +44,7 @@ func handleSetCommand(buf []byte, store map[string]StoreValue) map[string]StoreV
 		timeout = 0
 	}
 
-	store[key] = StoreValue{value: value, timeout: timeout, timeAdded: int(time.Now().Unix())}
+	store[key] = StoreValue{value: value, timeout: int64(timeout), timeAdded: getTimeInMilliseconds()}
 	return store
 }
 
