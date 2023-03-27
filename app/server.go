@@ -2,12 +2,14 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"net"
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -17,21 +19,60 @@ type StoreValue struct {
 	timeAdded int64
 }
 
-func getTimeInMilliseconds() int64 {
-	return time.Now().UnixNano() / int64(time.Millisecond)
+type Store interface {
+	Set(key string, value string, timeout int64)
+	Get(key string) string
+	GetAll() map[string]StoreValue
+	CheckAllValuesForExpired()
 }
 
-func checkAllValuesForExpired(store map[string]StoreValue) {
-	for key, value := range store {
-		if value.timeout != 0 {
-			if value.timeAdded+value.timeout < getTimeInMilliseconds() {
-				delete(store, key)
-			}
+type InMemoryStore struct {
+	store      map[string]StoreValue
+	storeMutex sync.Mutex
+	Store
+}
+
+func (store *InMemoryStore) Set(key string, value string, timeout int64) {
+	store.storeMutex.Lock()
+	defer store.storeMutex.Unlock()
+	store.store[key] = StoreValue{
+		value:     value,
+		timeout:   timeout,
+		timeAdded: getTimeInMilliseconds(),
+	}
+}
+
+func (store *InMemoryStore) GetAll() map[string]StoreValue {
+	store.storeMutex.Lock()
+	defer store.storeMutex.Unlock()
+	return store.store
+}
+
+func (store *InMemoryStore) Get(key string) (string, error) {
+	store.storeMutex.Lock()
+	defer store.storeMutex.Unlock()
+	if val, ok := store.store[key]; ok {
+		return val.value, nil
+	} else {
+		return "", errors.New("expired or missing")
+	}
+}
+
+func (store *InMemoryStore) CheckAllValuesForExpired() {
+	for k, v := range store.GetAll() {
+		if v.timeout != 0 && getTimeInMilliseconds() > v.timeAdded+v.timeout {
+			store.storeMutex.Lock()
+			delete(store.store, k)
+			store.storeMutex.Unlock()
 		}
 	}
 }
 
-func handleSetCommand(buf []byte, store map[string]StoreValue) map[string]StoreValue {
+func getTimeInMilliseconds() int64 {
+	return time.Now().UnixNano() / int64(time.Millisecond)
+}
+
+func handleSetCommand(buf []byte, store *InMemoryStore) {
 	split := bytes.Split(buf, []byte("\r\n"))
 
 	key := string(split[4])
@@ -39,28 +80,30 @@ func handleSetCommand(buf []byte, store map[string]StoreValue) map[string]StoreV
 
 	var timeout int
 	if len(split) > 10 {
-		timeout, _ = strconv.Atoi(string(split[10]))
+		t, err := strconv.Atoi(string(split[10]))
+		if err != nil {
+			fmt.Println("Error converting timeout to int: ", err.Error())
+		}
+		timeout = t
 	} else {
 		timeout = 0
 	}
 
-	store[key] = StoreValue{value: value, timeout: int64(timeout), timeAdded: getTimeInMilliseconds()}
-	return store
+	store.Set(key, value, int64(timeout))
 }
 
-func handleGetCommand(buf []byte, store map[string]StoreValue) string {
+func handleGetCommand(buf []byte, store *InMemoryStore) string {
 	split := bytes.Split(buf, []byte("\r\n"))
 	key := split[4]
 
-	if _, ok := store[string(key)]; ok {
-		v := store[string(key)].value
-		return "+" + v + "\r\n"
-	} else {
+	val, err := store.Get(string(key))
+	if err != nil {
 		return "$-1\r\n"
 	}
+	return "+" + val + "\r\n"
 }
 
-func handleRequest(conn net.Conn, store map[string]StoreValue) {
+func handleRequest(conn net.Conn, store *InMemoryStore) {
 	fmt.Println("Client connected: ", conn.RemoteAddr().String())
 
 	for {
@@ -86,7 +129,7 @@ func handleRequest(conn net.Conn, store map[string]StoreValue) {
 			message := bytes.Split(buf, []byte("\r\n"))[4]
 			conn.Write([]byte("+" + string(message) + "\r\n"))
 		case "set":
-			store = handleSetCommand(buf, store)
+			handleSetCommand(buf, store)
 			conn.Write([]byte("+OK\r\n"))
 		case "get":
 			value := handleGetCommand(buf, store)
@@ -101,11 +144,13 @@ func handleRequest(conn net.Conn, store map[string]StoreValue) {
 func main() {
 	l, err := net.Listen("tcp", "0.0.0.0:6379")
 
-	store := make(map[string]StoreValue)
+	store := InMemoryStore{store: map[string]StoreValue{}}
+	ticker := time.NewTicker(10 * time.Millisecond)
 	go func() {
-		for {
-			checkAllValuesForExpired(store)
+		for range ticker.C {
+			store.CheckAllValuesForExpired()
 		}
+		defer ticker.Stop()
 	}()
 
 	if err != nil {
@@ -129,6 +174,6 @@ func main() {
 			fmt.Println("Error accepting connection: ", err.Error())
 			os.Exit(1)
 		}
-		go handleRequest(conn, store)
+		go handleRequest(conn, &store)
 	}
 }
