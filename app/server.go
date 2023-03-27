@@ -6,10 +6,55 @@ import (
 	"io"
 	"net"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 )
 
-func handleRequest(conn net.Conn, store map[string]string) {
+type StoreValue struct {
+	value     string
+	timeout   int
+	timeAdded int
+}
+
+func checkAllValuesForExpired(store map[string]StoreValue) {
+	for key, value := range store {
+		if value.timeout != 0 {
+			if value.timeAdded+(value.timeout/1000) < int(time.Now().Unix()) {
+				delete(store, key)
+			}
+		}
+	}
+}
+
+func handleSetCommand(buf []byte, store map[string]StoreValue) map[string]StoreValue {
+	split := bytes.Split(buf, []byte("\r\n"))
+
+	key := string(split[4])
+	value := string(split[6])
+
+	timeout, err := strconv.Atoi(string(split[10]))
+	if err != nil {
+		timeout = 0
+	}
+
+	store[key] = StoreValue{value: value, timeout: timeout, timeAdded: int(time.Now().Unix())}
+	return store
+}
+
+func handleGetCommand(buf []byte, store map[string]StoreValue) string {
+	split := bytes.Split(buf, []byte("\r\n"))
+	key := split[4]
+
+	if _, ok := store[string(key)]; ok {
+		v := store[string(key)].value
+		return "+" + v + "\r\n"
+	} else {
+		return "$-1\r\n"
+	}
+}
+
+func handleRequest(conn net.Conn, store map[string]StoreValue) {
 	fmt.Println("Client connected: ", conn.RemoteAddr().String())
 
 	for {
@@ -35,14 +80,11 @@ func handleRequest(conn net.Conn, store map[string]string) {
 			message := bytes.Split(buf, []byte("\r\n"))[4]
 			conn.Write([]byte("+" + string(message) + "\r\n"))
 		case "set":
-			key := bytes.Split(buf, []byte("\r\n"))[4]
-			value := bytes.Split(buf, []byte("\r\n"))[6]
-			store[string(key)] = string(value)
+			store = handleSetCommand(buf, store)
 			conn.Write([]byte("+OK\r\n"))
 		case "get":
-			key := bytes.Split(buf, []byte("\r\n"))[4]
-			value := store[string(key)]
-			conn.Write([]byte("+" + value + "\r\n"))
+			value := handleGetCommand(buf, store)
+			conn.Write([]byte(value))
 		default:
 			conn.Write([]byte("+OK\r\n"))
 		}
@@ -53,7 +95,13 @@ func handleRequest(conn net.Conn, store map[string]string) {
 func main() {
 	l, err := net.Listen("tcp", "0.0.0.0:6379")
 
-	store := make(map[string]string)
+	store := make(map[string]StoreValue)
+	go func() {
+		for {
+			checkAllValuesForExpired(store)
+			time.Sleep(500 * time.Millisecond)
+		}
+	}()
 
 	if err != nil {
 		fmt.Println("Failed to bind to port 6379")
@@ -77,7 +125,5 @@ func main() {
 			os.Exit(1)
 		}
 		go handleRequest(conn, store)
-
 	}
-
 }
