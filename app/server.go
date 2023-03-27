@@ -101,7 +101,6 @@ func main() {
 	go func() {
 		for {
 			checkAllValuesForExpired(store)
-			time.Sleep(500 * time.Millisecond)
 		}
 	}()
 
