@@ -33,8 +33,10 @@ func handleSetCommand(buf []byte, store map[string]StoreValue) map[string]StoreV
 	key := string(split[4])
 	value := string(split[6])
 
-	timeout, err := strconv.Atoi(string(split[10]))
-	if err != nil {
+	var timeout int
+	if len(split) > 10 {
+		timeout, _ = strconv.Atoi(string(split[10]))
+	} else {
 		timeout = 0
 	}
 
